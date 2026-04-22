@@ -1,5 +1,4 @@
 const express = require("express");
-const fetch = require("node-fetch");
 const cors = require("cors");
 
 const app = express();
@@ -7,14 +6,15 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.post("/v1/chat/completions", async (req, res) => {
+// ⭐ 改成 root route（Janitor Other 最容易打到）
+app.post("/", async (req, res) => {
   try {
     const apiKey =
       req.headers.authorization?.replace("Bearer ", "") ||
       req.body.api_key;
 
     if (!apiKey) {
-      return res.status(401).json({ error: "No API key provided" });
+      return res.json({ text: "missing api key" });
     }
 
     let userText = "";
@@ -22,14 +22,12 @@ app.post("/v1/chat/completions", async (req, res) => {
     if (req.body.messages) {
       userText =
         req.body.messages[req.body.messages.length - 1]?.content || "";
-    }
-
-    if (req.body.prompt) {
+    } else if (req.body.prompt) {
       userText = req.body.prompt;
     }
 
     if (!userText) {
-      return res.status(400).json({ error: "No input text" });
+      return res.json({ text: "no input" });
     }
 
     const response = await fetch(
@@ -54,16 +52,16 @@ app.post("/v1/chat/completions", async (req, res) => {
 
     const text =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "No response";
+      "no response";
 
-    // ⭐⭐⭐ 最重要：Janitor Other 最相容格式
+    // ⭐ Janitor 最寬鬆格式
     return res.json({
-      text: text
+      text
     });
 
-  } catch (error) {
-    return res.status(500).json({
-      text: "Error: " + error.toString()
+  } catch (err) {
+    return res.json({
+      text: "error: " + err.toString()
     });
   }
 });
