@@ -4,21 +4,37 @@ const fetch = require("node-fetch");
 const app = express();
 app.use(express.json());
 
-// Janitor AI 會呼叫這個
+// 同時支援 OpenAI & Other
 app.post("/v1/chat/completions", async (req, res) => {
   try {
-    // 從 header 拿 API key
-    const apiKey = req.headers.authorization?.replace("Bearer ", "");
+    // ✅ API key（支援兩種來源）
+    const apiKey =
+      req.headers.authorization?.replace("Bearer ", "") ||
+      req.body.api_key;
 
     if (!apiKey) {
       return res.status(401).json({ error: "No API key provided" });
     }
 
-    // 取得對話內容
-    const messages = req.body.messages || [];
-    const lastMessage = messages[messages.length - 1]?.content || "";
+    // ✅ 判斷格式（messages or prompt）
+    let userText = "";
 
-    // 呼叫 Gemini API
+    // OpenAI 格式
+    if (req.body.messages) {
+      userText =
+        req.body.messages[req.body.messages.length - 1]?.content || "";
+    }
+
+    // Other 格式
+    if (req.body.prompt) {
+      userText = req.body.prompt;
+    }
+
+    if (!userText) {
+      return res.status(400).json({ error: "No input text" });
+    }
+
+    // 🔥 呼叫 Gemini
     const response = await fetch(
       "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=" +
         apiKey,
@@ -30,7 +46,7 @@ app.post("/v1/chat/completions", async (req, res) => {
         body: JSON.stringify({
           contents: [
             {
-              parts: [{ text: lastMessage }]
+              parts: [{ text: userText }]
             }
           ]
         })
@@ -43,14 +59,27 @@ app.post("/v1/chat/completions", async (req, res) => {
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "No response";
 
-    // 回傳 Janitor 能理解的格式
-    res.json({
-      choices: [
-        {
-          message: {
-            role: "assistant",
-            content: text
+    // ✅ 判斷回傳格式（對應 Janitor 模式）
+    
+    // OpenAI 回傳
+    if (req.body.messages) {
+      return res.json({
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content: text
+            }
           }
+        ]
+      });
+    }
+
+    // Other 回傳（最通用）
+    return res.json({
+      results: [
+        {
+          text: text
         }
       ]
     });
@@ -62,7 +91,6 @@ app.post("/v1/chat/completions", async (req, res) => {
   }
 });
 
-// 啟動伺服器
 app.listen(process.env.PORT || 3000, () => {
   console.log("Server running...");
 });
