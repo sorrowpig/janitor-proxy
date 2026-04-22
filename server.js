@@ -6,28 +6,23 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ⭐ 改成 root route（Janitor Other 最容易打到）
-app.post("/", async (req, res) => {
+// ⭐ 不限制路由（Janitor Other 常亂打）
+app.post("*", async (req, res) => {
   try {
     const apiKey =
       req.headers.authorization?.replace("Bearer ", "") ||
       req.body.api_key;
 
-    if (!apiKey) {
-      return res.json({ text: "missing api key" });
-    }
+    let text =
+      req.body.prompt ||
+      req.body.text ||
+      req.body.input ||
+      (req.body.messages &&
+        req.body.messages[req.body.messages.length - 1]?.content) ||
+      "";
 
-    let userText = "";
-
-    if (req.body.messages) {
-      userText =
-        req.body.messages[req.body.messages.length - 1]?.content || "";
-    } else if (req.body.prompt) {
-      userText = req.body.prompt;
-    }
-
-    if (!userText) {
-      return res.json({ text: "no input" });
+    if (!apiKey || !text) {
+      return res.json({ text: "missing input" });
     }
 
     const response = await fetch(
@@ -41,7 +36,7 @@ app.post("/", async (req, res) => {
         body: JSON.stringify({
           contents: [
             {
-              parts: [{ text: userText }]
+              parts: [{ text }]
             }
           ]
         })
@@ -50,19 +45,15 @@ app.post("/", async (req, res) => {
 
     const data = await response.json();
 
-    const text =
+    const output =
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "no response";
 
-    // ⭐ Janitor 最寬鬆格式
-    return res.json({
-      text
-    });
+    // ⭐ Janitor 最寬鬆回傳
+    return res.send(output);
 
-  } catch (err) {
-    return res.json({
-      text: "error: " + err.toString()
-    });
+  } catch (e) {
+    return res.send("error: " + e.toString());
   }
 });
 
