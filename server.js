@@ -56,13 +56,14 @@ app.post("/v1/chat/completions", async (req, res) => {
       data?.candidates?.[0]?.content?.parts?.[0]?.text ||
       "No response";
 
+    // ⭐⭐⭐ 最重要：Janitor Other 最相容格式
     return res.json({
-      response: text
+      text: text
     });
 
   } catch (error) {
     return res.status(500).json({
-      error: error.toString()
+      text: "Error: " + error.toString()
     });
   }
 });
